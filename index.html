@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <title>Web Game Tuổi Thơ Của Tôi</title>
@@ -12,6 +13,7 @@
             margin: 0;
             padding: 20px;
         }
+
         #game-container {
             width: 100%;
             height: 600px;
@@ -22,6 +24,7 @@
     </style>
     <script src="https://cjrtnc.leaningtech.com/2.3/loader.js"></script>
 </head>
+
 <body>
 
     <h1>🐍 Rắn Săn Mồi - Nokia 🐍</h1>
@@ -30,23 +33,18 @@
     <div id="game-container"></div>
 
     <script>
-        // Hàm khởi tạo và chạy game
         async function loadGame() {
-            // Khởi động hệ thống CheerpJ
             await cheerpjInit();
-            
-            // Tạo vùng hiển thị cho game (giả lập màn hình điện thoại)
             const element = document.getElementById('game-container');
-            
-            // Chạy file game. Thay 'game.jar' bằng tên file game của bạn
-            // "/app/" là đường dẫn ảo bắt buộc của CheerpJ
-            cheerpjCreateDisplay(800, 600, element); 
-            await cheerpjRunJar("/app/game.jar"); 
-        }
+            cheerpjCreateDisplay(800, 600, element);
 
-        // Gọi hàm chạy game
+            // Sử dụng trình chạy J2ME chuyên dụng của CheerpJ
+            // Tham số đầu tiên là lớp thực thi chính của hệ máy Java Micro Edition
+            await cheerpjRunMain("com.sun.midp.main.MIDletSuiteLoader", "/app/game.jar");
+        }
         loadGame();
     </script>
 
 </body>
+
 </html>
