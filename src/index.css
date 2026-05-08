@@ -1,0 +1,157 @@
+/* ========================================
+   ARCADE MUSIC TERMINAL — Global Styles
+   ======================================== */
+
+:root {
+  /* Colors */
+  --color-bg-primary: #050505;
+  --color-bg-secondary: #0a0f0a;
+  --color-bg-card: #0d150d;
+  --color-bg-hover: #0f2010;
+  --color-bg-active: #0a1f0a;
+  --color-bg-sidebar: #080c08;
+  --color-bg-input: #080e08;
+
+  --color-neon-primary: #00ff41;
+  --color-neon-dim: #00cc33;
+  --color-neon-dark: #008f20;
+  --color-neon-darker: #005c15;
+  --color-neon-glow: rgba(0, 255, 65, 0.15);
+  --color-neon-glow-strong: rgba(0, 255, 65, 0.3);
+
+  --color-text-primary: #00ff41;
+  --color-text-secondary: #00cc33;
+  --color-text-muted: #006b1a;
+  --color-text-dim: #004d12;
+
+  --color-border: #003d10;
+  --color-border-bright: #005c15;
+  --color-scrollbar: #00ff41;
+
+  /* Typography */
+  --font-mono: 'Space Mono', 'Fira Code', 'Courier New', monospace;
+  --font-pixel: 'Press Start 2P', monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 28px;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+
+  /* Layout */
+  --sidebar-width: 210px;
+  --bottom-bar-height: 56px;
+  --border-radius: 4px;
+  --border-radius-lg: 8px;
+}
+
+/* Reset */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neon-dark);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neon-primary);
+}
+
+/* Selection */
+::selection {
+  background: rgba(0, 255, 65, 0.3);
+  color: var(--color-neon-primary);
+}
+
+/* Utilities */
+.neon-text {
+  text-shadow: 0 0 4px #00ff41, 0 0 8px #00ff41, 0 0 16px rgba(0, 255, 65, 0.5);
+}
+
+.neon-text-dim {
+  text-shadow: 0 0 4px rgba(0, 204, 51, 0.5);
+}
+
+.neon-box {
+  box-shadow: 0 0 4px rgba(0, 255, 65, 0.3), 0 0 8px rgba(0, 255, 65, 0.15), inset 0 0 4px rgba(0, 255, 65, 0.1);
+}
+
+button {
+  font-family: var(--font-mono);
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+input {
+  font-family: var(--font-mono);
+  color: var(--color-text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+a {
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+/* CRT Scanline overlay */
+#root::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
