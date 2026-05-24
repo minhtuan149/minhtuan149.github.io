@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Library & Achievements Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        steam: {
+                            dark: '#171a21',
+                            light: '#1b2838',
+                            blue: '#66c0f4',
+                            darkblue: '#2a475e',
+                            text: '#c7d5e0'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #171a21;
+            color: #c7d5e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        /* Custom Scrollbar for Steam feel */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1b2838; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a475e; 
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #66c0f4; 
+        }
+        
+        .game-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+        
+        .achievement-icon {
+            width: 64px;
+            height: 64px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .locked-achievement .achievement-icon {
+            filter: grayscale(100%) opacity(0.5);
+        }
+        .locked-achievement .achievement-text {
+            color: #8f98a0;
+        }
+        
+        #modal-overlay {
+            backdrop-filter: blur(5px);
+        }
+        
+        .loader {
+            border: 4px solid #2a475e;
+            border-top: 4px solid #66c0f4;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-steam-light shadow-md py-4 px-6 flex items-center justify-between sticky top-0 z-10">
+        <div class="flex items-center gap-3">
+            <i class="fa-brands fa-steam text-3xl text-white"></i>
+            <h1 class="text-2xl font-bold text-white uppercase tracking-wider">Steam Library</h1>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-6 max-w-7xl mx-auto w-full">
+        
+        <!-- Config Section -->
+        <section class="bg-steam-light p-6 rounded-lg shadow-lg mb-8 border border-steam-darkblue text-center sm:text-left">
+            <h2 class="text-xl font-bold text-white mb-4">Kết nối tài khoản Steam</h2>
+            <div class="flex flex-col sm:flex-row items-center gap-6">
+                <!-- Steam Login Button -->
+                <button id="steam-login-btn" onclick="loginWithSteam()" class="hover:scale-105 transition-transform drop-shadow-lg">
+                    <img src="https://community.cloudflare.steamstatic.com/public/images/signinthroughsteam/sits_02.png" alt="Sign in through Steam">
+                </button>
+                
+                <div class="text-gray-500 font-bold hidden sm:block text-sm">HOẶC</div>
+                
+                <div class="flex-grow w-full">
+                    <label class="block text-sm font-medium mb-2 text-gray-300">Nhập đường dẫn Profile thủ công</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="profileUrl" class="w-full bg-steam-dark border border-steam-darkblue rounded p-3 text-white focus:outline-none focus:border-steam-blue" placeholder="VD: https://steamcommunity.com/id/gabelogannewell">
+                        <button onclick="loadLibrary()" class="bg-steam-blue hover:bg-blue-400 text-steam-dark font-bold py-2 px-6 rounded transition duration-200 whitespace-nowrap">
+                            <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="main-status" class="text-sm font-medium mt-4"></div>
+            <div class="mt-3 text-xs text-gray-400 bg-steam-dark p-3 rounded border border-steam-darkblue">
+                <i class="fa-solid fa-circle-info text-steam-blue mr-1"></i> Để công cụ có thể quét được Game và Thành Tựu, tài khoản Steam của bạn <strong>bắt buộc phải đặt "Game details" ở chế độ Public (Công khai)</strong>. Đăng nhập Steam qua giao thức bảo mật OpenID.
+            </div>
+        </section>
+
+        <!-- Error Message -->
+        <div id="error-box" class="hidden bg-red-900 border border-red-700 text-white px-4 py-3 rounded relative mb-6" role="alert">
+            <strong class="font-bold">Lỗi!</strong>
+            <span class="block sm:inline" id="error-message"></span>
+        </div>
+
+        <!-- Profile Info (New) -->
+        <div id="profile-info" class="hidden bg-steam-light p-6 rounded-lg shadow-lg mb-8 border border-steam-darkblue flex flex-col sm:flex-row items-center gap-6 transition-all duration-500 ease-in-out">
+            <img id="profile-avatar" src="" alt="Avatar" class="w-24 h-24 rounded-full border-2 border-steam-blue shadow-[0_0_15px_rgba(102,192,244,0.3)]">
+            <div class="text-center sm:text-left">
+                <h2 id="profile-name" class="text-3xl font-bold text-white mb-2"></h2>
+                <div class="flex flex-col sm:flex-row items-center gap-3 text-sm text-gray-400">
+                    <span id="profile-steamid"><i class="fa-brands fa-steam"></i> </span>
+                    <span class="hidden sm:inline">|</span>
+                    <a id="profile-link" href="#" target="_blank" class="hover:text-steam-blue transition"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Profile Steam</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Games Grid -->
+        <div id="games-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <!-- Games will be injected here -->
+        </div>
+
+    </main>
+
+    <!-- Modal for Achievements -->
+    <div id="achievement-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div id="modal-overlay" class="absolute inset-0 bg-black bg-opacity-70" onclick="closeModal()"></div>
+        <div class="bg-steam-light border border-steam-darkblue rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col relative z-10 shadow-2xl">
+            
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-steam-darkblue flex items-start gap-4">
+                <img id="modal-game-img" src="" alt="Game Image" class="w-32 h-auto rounded shadow bg-steam-dark">
+                <div class="flex-grow">
+                    <h2 id="modal-game-title" class="text-2xl font-bold text-white mb-2">Tên Game</h2>
+                    <div class="flex gap-4 text-sm text-gray-400">
+                        <span id="modal-playtime"><i class="fa-regular fa-clock mr-1"></i> 0 giờ</span>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-2xl"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content (Achievements List) -->
+            <div id="modal-content" class="p-4 overflow-y-auto flex-grow bg-steam-dark">
+                <!-- Loader inside modal -->
+                <div id="modal-loader" class="hidden flex flex-col items-center justify-center py-12">
+                    <div class="loader mb-4"></div>
+                    <p>Đang tải thành tựu...</p>
+                </div>
+                
+                <!-- Stats Summary -->
+                <div id="achievement-stats-header" class="hidden bg-steam-darkblue p-3 rounded mb-4 text-center font-bold text-white">
+                    <!-- Progress bar injected here -->
+                </div>
+
+                <!-- Achievements Grid -->
+                <div id="achievements-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Achievements injected here -->
+                </div>
+                
+                <!-- No Achievements Message -->
+                <div id="no-achievements-msg" class="hidden text-center py-12 text-gray-400">
+                    <i class="fa-regular fa-face-frown text-4xl mb-3"></i>
+                    <p>Trò chơi này không có thành tựu, hoặc chưa từng được chơi trên tài khoản này.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // State
+        let currentProfileBaseUrl = null; 
+        let globalGamesData = [];
+
+        function loginWithSteam() {
+            try {
+                const returnTo = window.location.href.split('?')[0]; 
+                
+                // 1. Kiểm tra môi trường (Chạy file offline hoặc Preview ảo)
+                if (!returnTo.startsWith('http')) {
+                    showError("Bạn đang chạy code dạng File/Preview ảo. Steam Login bắt buộc web phải có link host (http/https). Vui lòng dùng ô 'Nhập đường dẫn thủ công' bên cạnh.");
+                    return;
+                }
+
+                // 2. Kiểm tra xem có đang nằm trong khung Iframe (Môi trường Preview nhúng) không
+                if (window.self !== window.top) {
+                     showError("Khung Preview này chặn chuyển hướng đăng nhập để bảo mật. Để test tính năng này, bạn cần tải file HTML về và đưa lên host, HOẶC tạm thời dùng ô Nhập link thủ công.");
+                     return;
+                }
+
+                const realm = window.location.origin;
+                
+                // Xây dựng URL Steam OpenID
+                const steamOpenIdUrl = 'https://steamcommunity.com/openid/login' +
+                    '?openid.ns=http://specs.openid.net/auth/2.0' +
+                    '&openid.mode=checkid_setup' +
+                    '&openid.return_to=' + encodeURIComponent(returnTo) +
+                    '&openid.realm=' + encodeURIComponent(realm) +
+                    '&openid.identity=http://specs.openid.net/auth/2.0/identifier_select' +
+                    '&openid.claimed_id=http://specs.openid.net/auth/2.0/identifier_select';
+                    
+                // Chuyển hướng người dùng sang trang đăng nhập của Steam
+                window.location.href = steamOpenIdUrl;
+            } catch (error) {
+                showError("Lỗi hệ thống khi mở đăng nhập: " + error.message);
+            }
+        }
+
+        // Tự động kiểm tra xem có phải đang từ trang Login Steam trả về không
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const claimedId = urlParams.get('openid.claimed_id');
+            
+            if (claimedId) {
+                // Trích xuất SteamID64 (17 chữ số) từ dữ liệu OpenID Steam trả về
+                const steamIdMatch = claimedId.match(/(\d{17})$/);
+                if (steamIdMatch) {
+                    const steamId64 = steamIdMatch[1];
+                    // Tự động điền URL
+                    document.getElementById('profileUrl').value = `https://steamcommunity.com/profiles/${steamId64}`;
+                    
+                    // Dọn dẹp URL trên thanh địa chỉ cho đẹp (xóa các tham số OpenID)
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    // Tự động kích hoạt quá trình tải dữ liệu
+                    setStatus("Kết nối Steam thành công. Đang tải thư viện...", true);
+                    setTimeout(() => {
+                        loadLibrary();
+                    }, 500);
+                }
+            }
+        });
+
+        // Utility: Fetch HTML content via proxy to bypass CORS
+        // Try multiple proxies if one fails
+        async function fetchViaProxy(url) {
+            const targetUrl = encodeURIComponent(url);
+            
+            const proxies = [
+                `https://api.allorigins.win/get?url=${targetUrl}`,
+                `https://corsproxy.io/?${targetUrl}`,            
+                `https://api.codetabs.com/v1/proxy?quest=${targetUrl}`
+            ];
+
+            let lastError = null;
+
+            for (let proxyUrl of proxies) {
+                try {
+                    const response = await fetch(proxyUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    let text = '';
+                    // Proxy allorigins /get trả về chuỗi JSON an toàn hơn
+                    if (proxyUrl.includes('allorigins.win/get')) {
+                        const json = await response.json();
+                        text = json.contents;
+                        if (!text) throw new Error("Empty contents from proxy");
+                    } else {
+                        text = await response.text();
+                    }
+
+                    // Kiểm tra xem Proxy có bị Steam đưa vào diện "chặn bot" bằng Cloudflare không
+                    if (text.includes('Just a moment...') || text.includes('Cloudflare') || text.includes('cf-browser-verification')) {
+                        throw new Error("Proxy bị Steam chặn (Cloudflare)");
+                    }
+
+                    return text;
+                } catch (e) {
+                    console.warn(`Proxy ${proxyUrl} failed, trying next...`, e.message);
+                    lastError = e;
+                }
+            }
+
+            throw new Error(`Trang web không thể tải dữ liệu. Steam chặn các yêu cầu nặc danh từ Proxy. Để làm web mượt như PanaxGames, bạn sẽ cần code thêm một Backend Server riêng.`);
+        }
+
+        // Parse user input to standardize the base URL for the profile
+        function parseProfileBaseUrl(input) {
+            let url = input.trim();
+            if (url.endsWith('/')) url = url.slice(0, -1);
+
+            if (!url.startsWith('http')) {
+                if (/^\d{17}$/.test(url)) {
+                    return `https://steamcommunity.com/profiles/${url}`;
+                } else {
+                    return `https://steamcommunity.com/id/${url}`;
+                }
+            }
+            
+            url = url.split('/games')[0];
+            url = url.split('/stats')[0];
+            return url;
+        }
+
+        function showError(msg) {
+            const errorBox = document.getElementById('error-box');
+            const errorMsg = document.getElementById('error-message');
+            errorMsg.innerText = msg;
+            errorBox.classList.remove('hidden');
+            document.getElementById('main-status').innerHTML = '';
+        }
+
+        function hideError() {
+            document.getElementById('error-box').classList.add('hidden');
+        }
+
+        function setStatus(msg, isLoading = false) {
+            const statusEl = document.getElementById('main-status');
+            if (isLoading) {
+                statusEl.innerHTML = `<span class="text-steam-blue"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i> ${msg}</span>`;
+            } else {
+                statusEl.innerHTML = `<span class="text-green-400"><i class="fa-solid fa-check mr-1"></i> ${msg}</span>`;
+            }
+        }
+
+        // Main function to load library
+        async function loadLibrary() {
+            hideError();
+            const profileInput = document.getElementById('profileUrl').value.trim();
+            const container = document.getElementById('games-container');
+            const profileInfo = document.getElementById('profile-info');
+
+            if (!profileInput) {
+                showError("Vui lòng nhập đường dẫn Profile.");
+                return;
+            }
+
+            container.innerHTML = '';
+            profileInfo.classList.add('hidden');
+            globalGamesData = [];
+            
+            try {
+                setStatus("Đang tải dữ liệu thư viện...", true);
+                currentProfileBaseUrl = parseProfileBaseUrl(profileInput);
+
+                const gamesUrl = `${currentProfileBaseUrl}/games/?tab=all`;
+                const htmlContent = await fetchViaProxy(gamesUrl);
+
+                // Kiểm tra xem Profile có đang bị Private không
+                if (htmlContent.includes('profile_private_info') || htmlContent.includes('This profile is private')) {
+                    throw new Error("Profile này đang được đặt ở chế độ Riêng tư (Private). Vui lòng vào Steam đổi 'Game details' thành Public.");
+                }
+
+                const profileMatch = htmlContent.match(/g_rgProfileData\s*=\s*(\{.*?\});/);
+                if (profileMatch) {
+                    try {
+                        const profileData = JSON.parse(profileMatch[1]);
+                        renderProfile(profileData);
+                    } catch (e) {
+                        console.warn("Không thể parse thông tin người dùng", e);
+                    }
+                }
+
+                // Trích xuất dữ liệu game bằng Regex linh hoạt hơn
+                const rgGamesMatch = htmlContent.match(/var\s+rgGames\s*=\s*(\[[^]*?\])\s*;/);
+                
+                if (!rgGamesMatch || rgGamesMatch.length < 2) {
+                     throw new Error("Không thể tìm thấy danh sách game. Có thể do URL không hợp lệ hoặc tài khoản chưa từng chơi game nào.");
+                }
+
+                const games = JSON.parse(rgGamesMatch[1]);
+                
+                if (!games || games.length === 0) {
+                     throw new Error("Tài khoản này không có game nào hoặc game bị ẩn.");
+                }
+
+                globalGamesData = games.map(g => {
+                    let hours = 0;
+                    if (g.hours_forever) {
+                        hours = parseFloat(g.hours_forever.replace(/,/g, ''));
+                    }
+                    return {
+                        appid: g.appid,
+                        name: g.name,
+                        playtime: hours,
+                        logo: g.logo,
+                        has_achievements: g.has_achievements || false,
+                        icon: g.icon
+                    };
+                }).sort((a, b) => b.playtime - a.playtime);
+                
+                renderGames(globalGamesData);
+                setStatus(`Đã tải thành công ${globalGamesData.length} trò chơi.`);
+
+            } catch (error) {
+                console.error(error);
+                showError(error.message);
+            }
+        }
+
+        function renderProfile(data) {
+            document.getElementById('profile-info').classList.remove('hidden');
+            document.getElementById('profile-avatar').src = data.avatar_url || 'https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg';
+            document.getElementById('profile-name').innerText = data.personaname || 'Người dùng ẩn danh';
+            document.getElementById('profile-steamid').innerHTML = `<i class="fa-brands fa-steam"></i> ${data.steamid || ''}`;
+            document.getElementById('profile-link').href = data.url || '#';
+        }
+
+        // Render games into the grid
+        function renderGames(games) {
+            const container = document.getElementById('games-container');
+            container.innerHTML = '';
+
+            games.forEach(game => {
+                // Header image URL
+                const imgUrl = `https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/header.jpg`;
+                const fallbackImgUrl = game.logo || `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.icon}.jpg`;
+                
+                // Add Trophy Badge if game has achievements
+                const achievementBadge = game.has_achievements 
+                    ? `<div class="absolute top-2 right-2 bg-yellow-500/90 text-black text-xs font-bold px-2 py-1 rounded shadow-lg backdrop-blur-sm" title="Có thành tựu"><i class="fa-solid fa-trophy"></i></div>`
+                    : '';
+
+                const card = document.createElement('div');
+                card.className = 'game-card bg-steam-darkblue rounded-lg overflow-hidden border border-steam-light flex flex-col h-full relative group';
+                card.onclick = () => openModal(game);
+
+                card.innerHTML = `
+                    <div class="h-32 bg-steam-dark overflow-hidden relative">
+                        <img src="${imgUrl}" onerror="this.src='${fallbackImgUrl}'; this.className='w-full h-full object-contain p-4'" alt="${game.name}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                        ${achievementBadge}
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition duration-300"></div>
+                    </div>
+                    <div class="p-3 flex flex-col justify-between flex-grow">
+                        <h3 class="font-bold text-white text-sm line-clamp-2 mb-2" title="${game.name}">${game.name}</h3>
+                        <p class="text-xs text-steam-blue"><i class="fa-regular fa-clock"></i> ${game.playtime.toFixed(1)} giờ chơi</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        /* --- Modal Logic --- */
+        function openModal(game) {
+            document.getElementById('achievement-modal').classList.remove('hidden');
+            
+            // Set Headers
+            const imgEl = document.getElementById('modal-game-img');
+            imgEl.src = `https://steamcdn-a.akamaihd.net/steam/apps/${game.appid}/header.jpg`;
+            imgEl.onerror = function() {
+                this.src = game.logo || `https://media.steampowered.com/steamcommunity/public/images/apps/${game.appid}/${game.icon}.jpg`;
+            };
+            
+            document.getElementById('modal-game-title').innerText = game.name;
+            document.getElementById('modal-playtime').innerHTML = `<i class="fa-regular fa-clock mr-1"></i> ${game.playtime.toFixed(1)} giờ`;
+            document.getElementById('achievement-stats-header').classList.add('hidden');
+            
+            // Clear content
+            document.getElementById('achievements-list').innerHTML = '';
+            document.getElementById('no-achievements-msg').classList.add('hidden');
+            
+            fetchGameAchievements(game);
+        }
+
+        function closeModal() {
+            document.getElementById('achievement-modal').classList.add('hidden');
+        }
+
+        async function fetchGameAchievements(game) {
+            const loader = document.getElementById('modal-loader');
+            const noDataMsg = document.getElementById('no-achievements-msg');
+            const headerStats = document.getElementById('achievement-stats-header');
+            
+            loader.classList.remove('hidden');
+            
+            try {
+                const statsUrl = `${currentProfileBaseUrl}/stats/${game.appid}/achievements/`;
+                const htmlContent = await fetchViaProxy(statsUrl);
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+
+                const achievementRows = doc.querySelectorAll('.achieveRow');
+
+                if (!achievementRows || achievementRows.length === 0) {
+                    throw new Error("NoAchievements");
+                }
+
+                let achievementsData = [];
+                let unlockedCount = 0;
+
+                achievementRows.forEach(row => {
+                    const isUnlocked = row.classList.contains('unlocked');
+                    
+                    // Icon
+                    const imgEl = row.querySelector('.achieveImgHolder img');
+                    const iconUrl = imgEl ? imgEl.src : '';
+
+                    // Text
+                    const txtEl = row.querySelector('.achieveTxtHolder');
+                    const title = txtEl ? txtEl.querySelector('h3').innerText.trim() : 'Unknown';
+                    const descEl = txtEl ? txtEl.querySelector('h5') : null;
+                    const desc = descEl ? descEl.innerText.trim() : '';
+
+                    // Date unlocked
+                    const unlockEl = row.querySelector('.achieveUnlockTime');
+                    const unlockTimeStr = unlockEl ? unlockEl.innerText.trim() : '';
+
+                    if (isUnlocked) unlockedCount++;
+
+                    achievementsData.push({
+                        title: title,
+                        description: desc,
+                        icon: iconUrl,
+                        isUnlocked: isUnlocked,
+                        unlockTimeStr: unlockTimeStr
+                    });
+                });
+
+                // Render Header Stats
+                const total = achievementsData.length;
+                const percentage = total > 0 ? Math.round((unlockedCount / total) * 100) : 0;
+                
+                headerStats.innerHTML = `
+                    <div class="flex justify-between mb-1">
+                        <span>Tiến trình hoàn thành</span>
+                        <span>${unlockedCount}/${total} (${percentage}%)</span>
+                    </div>
+                    <div class="w-full bg-steam-dark rounded-full h-2.5">
+                        <div class="bg-steam-blue h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                headerStats.classList.remove('hidden');
+
+                // Render List
+                loader.classList.add('hidden');
+                renderAchievements(achievementsData);
+
+            } catch (error) {
+                loader.classList.add('hidden');
+                console.error(error);
+                if (error.message === "NoAchievements" || error.message.includes('Unexpected token')) {
+                    noDataMsg.classList.remove('hidden');
+                } else {
+                    noDataMsg.innerHTML = `<i class="fa-solid fa-circle-exclamation text-4xl mb-3 text-red-500"></i><p>Không thể tải dữ liệu thành tựu. Cần đảm bảo tài khoản đã từng chơi game này.</p>`;
+                    noDataMsg.classList.remove('hidden');
+                }
+            }
+        }
+
+        function renderAchievements(achievements) {
+            const container = document.getElementById('achievements-list');
+            container.innerHTML = '';
+
+            achievements.forEach(ach => {
+                let dateStrHTML = "";
+                if (ach.isUnlocked && ach.unlockTimeStr) {
+                    // Extract just the date/time part from "Unlocked 12 May @ 3:00pm"
+                    let timeClean = ach.unlockTimeStr.replace('Unlocked ', '');
+                    dateStrHTML = `<div class="text-xs text-steam-blue mt-1"><i class="fa-regular fa-calendar-check mr-1"></i> ${timeClean}</div>`;
+                }
+
+                const item = document.createElement('div');
+                item.className = `flex items-center gap-4 bg-[#1b2838] p-3 rounded border ${ach.isUnlocked ? 'border-[#2a475e]' : 'border-transparent locked-achievement'}`;
+                
+                // Fallback image handling
+                const defaultIcon = 'https://steamcommunity-a.akamaihd.net/public/images/skin_1/achievement_locked_default.jpg';
+                
+                item.innerHTML = `
+                    <img src="${ach.icon || defaultIcon}" alt="Icon" class="achievement-icon border border-black shadow">
+                    <div class="flex-grow achievement-text">
+                        <h4 class="font-bold text-sm ${ach.isUnlocked ? 'text-white' : ''}">${ach.title}</h4>
+                        <p class="text-xs text-gray-400 mt-1">${ach.description || 'Thành tựu ẩn'}</p>
+                        ${dateStrHTML}
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('achievement-modal').classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
