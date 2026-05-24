@@ -5,5 +5,5 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/steam-profile-stats/', // đổi thành tên repo GitHub của bạn
+  base: '/', // đổi thành tên repo GitHub của bạn
 })
