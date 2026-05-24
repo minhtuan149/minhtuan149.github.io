@@ -368,12 +368,8 @@
                 const gamesUrl = `${currentProfileBaseUrl}/games/?tab=all`;
                 const htmlContent = await fetchViaProxy(gamesUrl);
 
-                // Kiểm tra xem Profile có đang bị Private không
-                if (htmlContent.includes('profile_private_info') || htmlContent.includes('This profile is private')) {
-                    throw new Error("Profile này đang được đặt ở chế độ Riêng tư (Private). Vui lòng vào Steam đổi 'Game details' thành Public.");
-                }
-
-                const profileMatch = htmlContent.match(/g_rgProfileData\s*=\s*(\{.*?\});/);
+                // Trích xuất thông tin Profile
+                const profileMatch = htmlContent.match(/g_rgProfileData\s*=\s*(\{[\s\S]*?\});/);
                 if (profileMatch) {
                     try {
                         const profileData = JSON.parse(profileMatch[1]);
@@ -383,17 +379,27 @@
                     }
                 }
 
-                // Trích xuất dữ liệu game bằng Regex linh hoạt hơn
-                const rgGamesMatch = htmlContent.match(/var\s+rgGames\s*=\s*(\[[^]*?\])\s*;/);
+                // Kiểm tra xem Profile có đang bị Private hoàn toàn không
+                if (htmlContent.includes('profile_private_info') || htmlContent.includes('This profile is private')) {
+                    throw new Error("Hồ sơ này đang bị Khóa (Private). Bạn cần vào Steam > Edit Profile > Privacy Settings > Đặt 'My Profile' thành Public.");
+                }
+
+                // Trích xuất dữ liệu game bằng Regex được tối ưu lại an toàn hơn
+                const rgGamesMatch = htmlContent.match(/var\s+rgGames\s*=\s*(\[[\s\S]*?\])\s*;/);
                 
                 if (!rgGamesMatch || rgGamesMatch.length < 2) {
-                     throw new Error("Không thể tìm thấy danh sách game. Có thể do URL không hợp lệ hoặc tài khoản chưa từng chơi game nào.");
+                     if (profileMatch) {
+                         // Nếu thấy được Profile nhưng không thấy game -> Chắc chắn do Game Details bị Private
+                         throw new Error("LỖI QUYỀN RIÊNG TƯ: Tìm thấy tài khoản nhưng bị ẩn danh sách Game! \n👉 Vui lòng vào Steam > Edit Profile > Privacy Settings > Đặt mục 'Game details' thành 'Public' (Công khai).");
+                     } else {
+                         throw new Error("Không thể trích xuất dữ liệu game. Đảm bảo URL đúng hoặc thử lại sau (Proxy có thể đang bị chặn).");
+                     }
                 }
 
                 const games = JSON.parse(rgGamesMatch[1]);
                 
                 if (!games || games.length === 0) {
-                     throw new Error("Tài khoản này không có game nào hoặc game bị ẩn.");
+                     throw new Error("Tài khoản này hiện không có game nào trong thư viện.");
                 }
 
                 globalGamesData = games.map(g => {
